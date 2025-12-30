@@ -1,22 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { db } from './firebase';
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc } from 'firebase/firestore';
 
 const MobissCatalog = () => {
   // Estado para controlar visualização (catalogo ou admin)
-  const [view, setView] = useState('catalog');
+  const [view, setView] = useState(() => {
+    // Verifica se a URL tem #admin
+    if (typeof window !== 'undefined' && window.location.hash === '#admin') {
+      return 'admin';
+    }
+    return 'catalog';
+  });
   const [isLoaded, setIsLoaded] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [isAdminAuthenticated, setIsAdminAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
   
-  // Estado dos produtos
-  const [products, setProducts] = useState(() => {
-    const saved = localStorage.getItem('mobiss_products');
-    return saved ? JSON.parse(saved) : [
-      { id: 1, name: 'Capinha Silicone Premium', category: 'cases', models: ['16-pro-max', '16-pro', '16-plus', '16', '15-pro-max', '15-pro'], price: 89.90, originalPrice: 119.90, image: '', colors: ['Preto', 'Branco', 'Azul Pacífico'], tag: 'Mais Pedida', magsafe: true },
-      { id: 2, name: 'Capinha Transparente Crystal', category: 'cases', models: ['16-pro-max', '16-pro', '16-plus', '16', '15-pro-max', '15-pro', '15-plus', '15'], price: 49.90, image: '', colors: ['Transparente'], tag: 'Novidade' },
-      { id: 3, name: 'Película Vidro Temperado 9H', category: 'screen', models: ['16-pro-max', '16-pro', '16-plus', '16', '15-pro-max', '15-pro', '15-plus', '15'], price: 39.90, image: '', tag: 'Mais Pedida' },
-      { id: 4, name: 'Carregador Turbo 20W USB-C', category: 'chargers', models: ['all'], price: 69.90, image: '', tag: '50% em 30min' },
-    ];
-  });
+  // Estado dos produtos (agora carrega do Firebase)
+  const [products, setProducts] = useState([]);
 
   // Estados do catálogo
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -29,6 +30,7 @@ const MobissCatalog = () => {
   const [showProductForm, setShowProductForm] = useState(false);
   const [selectedProductForWhatsapp, setSelectedProductForWhatsapp] = useState(null);
   const [selectedColor, setSelectedColor] = useState('');
+  const [saving, setSaving] = useState(false);
   const fileInputRef = useRef(null);
 
   // Cores oficiais Mobiss
@@ -75,13 +77,25 @@ const MobissCatalog = () => {
 
   const tagOptions = ['', 'Mais Pedida', 'Novidade', 'Promoção', 'Original', 'Proteção Total', 'Indestrutível', '3 em 1', '50% em 30min'];
 
+  // Carregar produtos do Firebase
   useEffect(() => {
-    setIsLoaded(true);
+    const fetchProducts = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'products'));
+        const productsData = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setProducts(productsData);
+      } catch (error) {
+        console.error('Erro ao carregar produtos:', error);
+      } finally {
+        setLoading(false);
+        setIsLoaded(true);
+      }
+    };
+    fetchProducts();
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('mobiss_products', JSON.stringify(products));
-  }, [products]);
 
   const filteredProducts = products.filter(product => {
     const categoryMatch = selectedCategory === 'all' || product.category === selectedCategory;
@@ -121,51 +135,71 @@ const MobissCatalog = () => {
   // Funções do Admin
   const handleAdminLogin = (e) => {
     e.preventDefault();
-    if (adminPassword === 'mobiss2025') {
+    if (adminPassword === 'M@bussinesADM26') {
       setIsAdminAuthenticated(true);
     } else {
       alert('Senha incorreta!');
     }
   };
 
-  const handleImageUpload = (e, productId = null) => {
+  const handleImageUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // Limitar tamanho a 2MB para não sobrecarregar o Firestore
+      if (file.size > 2000000) {
+        alert('Imagem muito grande! Use uma imagem menor que 2MB.');
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
-        if (productId) {
-          setProducts(products.map(p => 
-            p.id === productId ? { ...p, image: reader.result } : p
-          ));
-        } else if (editingProduct) {
-          setEditingProduct({ ...editingProduct, image: reader.result });
-        }
+        setEditingProduct({ ...editingProduct, image: reader.result });
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const handleSaveProduct = (e) => {
+  const handleSaveProduct = async (e) => {
     e.preventDefault();
-    if (editingProduct.id) {
-      setProducts(products.map(p => p.id === editingProduct.id ? editingProduct : p));
-    } else {
-      const newId = Math.max(...products.map(p => p.id), 0) + 1;
-      setProducts([...products, { ...editingProduct, id: newId }]);
+    setSaving(true);
+    
+    try {
+      if (editingProduct.id && typeof editingProduct.id === 'string' && !editingProduct.id.startsWith('temp_')) {
+        // Atualizar produto existente
+        const productRef = doc(db, 'products', editingProduct.id);
+        const { id, ...productData } = editingProduct;
+        await updateDoc(productRef, productData);
+        setProducts(products.map(p => p.id === editingProduct.id ? editingProduct : p));
+      } else {
+        // Criar novo produto
+        const { id, ...productData } = editingProduct;
+        const docRef = await addDoc(collection(db, 'products'), productData);
+        setProducts([...products, { ...productData, id: docRef.id }]);
+      }
+      setEditingProduct(null);
+      setShowProductForm(false);
+    } catch (error) {
+      console.error('Erro ao salvar produto:', error);
+      alert('Erro ao salvar produto. Tente novamente.');
+    } finally {
+      setSaving(false);
     }
-    setEditingProduct(null);
-    setShowProductForm(false);
   };
 
-  const handleDeleteProduct = (id) => {
+  const handleDeleteProduct = async (id) => {
     if (confirm('Tem certeza que quer excluir este produto?')) {
-      setProducts(products.filter(p => p.id !== id));
+      try {
+        await deleteDoc(doc(db, 'products', id));
+        setProducts(products.filter(p => p.id !== id));
+      } catch (error) {
+        console.error('Erro ao excluir produto:', error);
+        alert('Erro ao excluir produto. Tente novamente.');
+      }
     }
   };
 
   const startNewProduct = () => {
     setEditingProduct({
-      id: null,
+      id: `temp_${Date.now()}`,
       name: '',
       category: 'cases',
       models: ['all'],
@@ -351,7 +385,7 @@ const MobissCatalog = () => {
         <div className="p-6 border-b border-gray-100">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-bold" style={{ color: colors.dark }}>
-              {editingProduct?.id ? 'Editar Produto' : 'Novo Produto'}
+              {editingProduct?.id && !String(editingProduct.id).startsWith('temp_') ? 'Editar Produto' : 'Novo Produto'}
             </h2>
             <button 
               onClick={() => { setShowProductForm(false); setEditingProduct(null); }}
@@ -367,7 +401,7 @@ const MobissCatalog = () => {
         <form onSubmit={handleSaveProduct} className="p-6 space-y-6">
           {/* Imagem */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Foto do Produto</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Foto do Produto (max 2MB)</label>
             <div className="flex items-center gap-4">
               <div 
                 className="w-32 h-32 rounded-2xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-gray-400 transition-colors overflow-hidden"
@@ -535,15 +569,17 @@ const MobissCatalog = () => {
               type="button"
               onClick={() => { setShowProductForm(false); setEditingProduct(null); }}
               className="flex-1 px-6 py-3 rounded-xl border border-gray-200 font-medium hover:bg-gray-50 transition-colors"
+              disabled={saving}
             >
               Cancelar
             </button>
             <button
               type="submit"
-              className="flex-1 px-6 py-3 rounded-xl text-white font-medium transition-all hover:opacity-90"
+              disabled={saving}
+              className="flex-1 px-6 py-3 rounded-xl text-white font-medium transition-all hover:opacity-90 disabled:opacity-50"
               style={{ background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDark})` }}
             >
-              {editingProduct?.id ? 'Salvar Alterações' : 'Criar Produto'}
+              {saving ? 'Salvando...' : (editingProduct?.id && !String(editingProduct.id).startsWith('temp_') ? 'Salvar Alterações' : 'Criar Produto')}
             </button>
           </div>
         </form>
@@ -806,7 +842,7 @@ const MobissCatalog = () => {
                 </div>
                 <div className="hidden sm:block">
                   <h1 className="text-xl font-bold tracking-tight text-white" style={{ fontFamily: "'Poppins', sans-serif" }}>
-                    mob<span style={{ color: colors.accent }}>i</span>ss
+                    mobiss
                   </h1>
                 </div>
               </div>
@@ -1053,16 +1089,10 @@ const MobissCatalog = () => {
                 <span className="text-white font-bold text-sm">m</span>
               </div>
               <span className="font-semibold" style={{ color: colors.primary }}>
-                mob<span style={{ color: colors.accent }}>i</span>ss
+                mobiss
               </span>
             </div>
             <p className="text-sm" style={{ color: colors.gray }}>© 2025 Mobiss. Feito com 🩵</p>
-            <button
-              onClick={() => setView('admin')}
-              className="text-xs text-gray-300 hover:text-gray-400 transition-colors"
-            >
-              •
-            </button>
           </div>
         </div>
       </footer>
