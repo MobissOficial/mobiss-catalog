@@ -378,214 +378,217 @@ const MobissCatalog = () => {
     </div>
   );
 
-  // Formulário de Produto
-  const ProductForm = () => (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-gray-100">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold" style={{ color: colors.dark }}>
-              {editingProduct?.id && !String(editingProduct.id).startsWith('temp_') ? 'Editar Produto' : 'Novo Produto'}
-            </h2>
-            <button 
-              onClick={() => { setShowProductForm(false); setEditingProduct(null); }}
-              className="p-2 rounded-full hover:bg-gray-100"
-            >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        
-        <form onSubmit={handleSaveProduct} className="p-6 space-y-6">
-          {/* Imagem */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Foto do Produto (max 2MB)</label>
-            <div className="flex items-center gap-4">
-              <div 
-                className="w-32 h-32 rounded-2xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-gray-400 transition-colors overflow-hidden"
-                onClick={() => fileInputRef.current?.click()}
-                style={{ background: colors.lightGray }}
+  // Formulário de Produto - renderizado inline para evitar perda de foco
+  const renderProductForm = () => {
+    if (!showProductForm) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="p-6 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-bold" style={{ color: colors.dark }}>
+                {editingProduct?.id && !String(editingProduct.id).startsWith('temp_') ? 'Editar Produto' : 'Novo Produto'}
+              </h2>
+              <button 
+                onClick={() => { setShowProductForm(false); setEditingProduct(null); }}
+                className="p-2 rounded-full hover:bg-gray-100"
               >
-                {editingProduct?.image ? (
-                  <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="text-center">
-                    <svg className="w-8 h-8 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                    </svg>
-                    <span className="text-xs text-gray-500 mt-1 block">Adicionar foto</span>
-                  </div>
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+          
+          <form onSubmit={handleSaveProduct} className="p-6 space-y-6">
+            {/* Imagem */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Foto do Produto (max 2MB)</label>
+              <div className="flex items-center gap-4">
+                <div 
+                  className="w-32 h-32 rounded-2xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-gray-400 transition-colors overflow-hidden"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{ background: colors.lightGray }}
+                >
+                  {editingProduct?.image ? (
+                    <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-center">
+                      <svg className="w-8 h-8 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      <span className="text-xs text-gray-500 mt-1 block">Adicionar foto</span>
+                    </div>
+                  )}
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => handleImageUpload(e)}
+                  className="hidden"
+                />
+                {editingProduct?.image && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingProduct({ ...editingProduct, image: '' })}
+                    className="text-sm text-red-500 hover:text-red-600"
+                  >
+                    Remover foto
+                  </button>
                 )}
               </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={(e) => handleImageUpload(e)}
-                className="hidden"
-              />
-              {editingProduct?.image && (
-                <button
-                  type="button"
-                  onClick={() => setEditingProduct({ ...editingProduct, image: '' })}
-                  className="text-sm text-red-500 hover:text-red-600"
-                >
-                  Remover foto
-                </button>
-              )}
             </div>
-          </div>
 
-          {/* Nome */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Nome do Produto *</label>
-            <input
-              type="text"
-              required
-              value={editingProduct?.name || ''}
-              onChange={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-opacity-50"
-              style={{ focusRing: colors.primary }}
-              placeholder="Ex: Capinha Silicone Premium"
-            />
-          </div>
-
-          {/* Categoria */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Categoria *</label>
-            <select
-              required
-              value={editingProduct?.category || 'cases'}
-              onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
-            >
-              {categories.filter(c => c.id !== 'all').map(cat => (
-                <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
-              ))}
-            </select>
-          </div>
-
-          {/* Preços */}
-          <div className="grid grid-cols-2 gap-4">
+            {/* Nome */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Preço *</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Nome do Produto *</label>
               <input
-                type="number"
+                type="text"
                 required
-                step="0.01"
-                min="0"
-                value={editingProduct?.price || ''}
-                onChange={(e) => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) })}
-                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
-                placeholder="89.90"
+                defaultValue={editingProduct?.name || ''}
+                onBlur={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-opacity-50"
+                placeholder="Ex: Capinha Silicone Premium"
               />
             </div>
+
+            {/* Categoria */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Preço Original (opcional)</label>
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={editingProduct?.originalPrice || ''}
-                onChange={(e) => setEditingProduct({ ...editingProduct, originalPrice: e.target.value ? parseFloat(e.target.value) : '' })}
+              <label className="block text-sm font-medium text-gray-700 mb-2">Categoria *</label>
+              <select
+                required
+                value={editingProduct?.category || 'cases'}
+                onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
-                placeholder="119.90"
-              />
+              >
+                {categories.filter(c => c.id !== 'all').map(cat => (
+                  <option key={cat.id} value={cat.id}>{cat.icon} {cat.name}</option>
+                ))}
+              </select>
             </div>
-          </div>
 
-          {/* Modelos de iPhone */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Modelos Compatíveis</label>
-            <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-3 bg-gray-50 rounded-xl">
-              {iphoneModels.map(model => (
-                <label key={model.id} className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300">
-                  <input
-                    type="checkbox"
-                    checked={editingProduct?.models?.includes(model.id) || false}
-                    onChange={(e) => {
-                      const models = editingProduct?.models || [];
-                      if (e.target.checked) {
-                        setEditingProduct({ ...editingProduct, models: [...models, model.id] });
-                      } else {
-                        setEditingProduct({ ...editingProduct, models: models.filter(m => m !== model.id) });
-                      }
-                    }}
-                    className="rounded"
-                  />
-                  <span className="text-sm">{model.name}</span>
-                </label>
-              ))}
+            {/* Preços */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Preço *</label>
+                <input
+                  type="number"
+                  required
+                  step="0.01"
+                  min="0"
+                  defaultValue={editingProduct?.price || ''}
+                  onBlur={(e) => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
+                  placeholder="89.90"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Preço Original (opcional)</label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  defaultValue={editingProduct?.originalPrice || ''}
+                  onBlur={(e) => setEditingProduct({ ...editingProduct, originalPrice: e.target.value ? parseFloat(e.target.value) : '' })}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
+                  placeholder="119.90"
+                />
+              </div>
             </div>
-          </div>
 
-          {/* Tag */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Tag (opcional)</label>
-            <select
-              value={editingProduct?.tag || ''}
-              onChange={(e) => setEditingProduct({ ...editingProduct, tag: e.target.value })}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
-            >
-              {tagOptions.map(tag => (
-                <option key={tag} value={tag}>{tag || 'Sem tag'}</option>
-              ))}
-            </select>
-          </div>
+            {/* Modelos de iPhone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Modelos Compatíveis</label>
+              <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-3 bg-gray-50 rounded-xl">
+                {iphoneModels.map(model => (
+                  <label key={model.id} className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300">
+                    <input
+                      type="checkbox"
+                      checked={editingProduct?.models?.includes(model.id) || false}
+                      onChange={(e) => {
+                        const models = editingProduct?.models || [];
+                        if (e.target.checked) {
+                          setEditingProduct({ ...editingProduct, models: [...models, model.id] });
+                        } else {
+                          setEditingProduct({ ...editingProduct, models: models.filter(m => m !== model.id) });
+                        }
+                      }}
+                      className="rounded"
+                    />
+                    <span className="text-sm">{model.name}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
 
-          {/* Cores */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Cores disponíveis (separadas por vírgula)</label>
-            <input
-              type="text"
-              value={editingProduct?.colors?.join(', ') || ''}
-              onChange={(e) => setEditingProduct({ 
-                ...editingProduct, 
-                colors: e.target.value.split(',').map(c => c.trim()).filter(c => c) 
-              })}
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
-              placeholder="Preto, Branco, Azul"
-            />
-          </div>
+            {/* Tag */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Tag (opcional)</label>
+              <select
+                value={editingProduct?.tag || ''}
+                onChange={(e) => setEditingProduct({ ...editingProduct, tag: e.target.value })}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
+              >
+                {tagOptions.map(tag => (
+                  <option key={tag} value={tag}>{tag || 'Sem tag'}</option>
+                ))}
+              </select>
+            </div>
 
-          {/* MagSafe */}
-          <div>
-            <label className="flex items-center gap-3 cursor-pointer">
+            {/* Cores */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Cores disponíveis (separadas por vírgula)</label>
               <input
-                type="checkbox"
-                checked={editingProduct?.magsafe || false}
-                onChange={(e) => setEditingProduct({ ...editingProduct, magsafe: e.target.checked })}
-                className="w-5 h-5 rounded"
+                type="text"
+                defaultValue={editingProduct?.colors?.join(', ') || ''}
+                onBlur={(e) => setEditingProduct({ 
+                  ...editingProduct, 
+                  colors: e.target.value.split(',').map(c => c.trim()).filter(c => c) 
+                })}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
+                placeholder="Preto, Branco, Azul"
               />
-              <span className="text-sm font-medium text-gray-700">Compatível com MagSafe</span>
-            </label>
-          </div>
+            </div>
 
-          {/* Botões */}
-          <div className="flex gap-3 pt-4">
-            <button
-              type="button"
-              onClick={() => { setShowProductForm(false); setEditingProduct(null); }}
-              className="flex-1 px-6 py-3 rounded-xl border border-gray-200 font-medium hover:bg-gray-50 transition-colors"
-              disabled={saving}
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="flex-1 px-6 py-3 rounded-xl text-white font-medium transition-all hover:opacity-90 disabled:opacity-50"
-              style={{ background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDark})` }}
-            >
-              {saving ? 'Salvando...' : (editingProduct?.id && !String(editingProduct.id).startsWith('temp_') ? 'Salvar Alterações' : 'Criar Produto')}
-            </button>
-          </div>
-        </form>
+            {/* MagSafe */}
+            <div>
+              <label className="flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editingProduct?.magsafe || false}
+                  onChange={(e) => setEditingProduct({ ...editingProduct, magsafe: e.target.checked })}
+                  className="w-5 h-5 rounded"
+                />
+                <span className="text-sm font-medium text-gray-700">Compatível com MagSafe</span>
+              </label>
+            </div>
+
+            {/* Botões */}
+            <div className="flex gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => { setShowProductForm(false); setEditingProduct(null); }}
+                className="flex-1 px-6 py-3 rounded-xl border border-gray-200 font-medium hover:bg-gray-50 transition-colors"
+                disabled={saving}
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="flex-1 px-6 py-3 rounded-xl text-white font-medium transition-all hover:opacity-90 disabled:opacity-50"
+                style={{ background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDark})` }}
+              >
+                {saving ? 'Salvando...' : (editingProduct?.id && !String(editingProduct.id).startsWith('temp_') ? 'Salvar Alterações' : 'Criar Produto')}
+              </button>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   // Tela de Login do Admin
   const AdminLogin = () => (
@@ -731,7 +734,7 @@ const MobissCatalog = () => {
         )}
       </main>
 
-      {showProductForm && <ProductForm />}
+      {renderProductForm()}
     </div>
   );
 
