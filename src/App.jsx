@@ -1391,21 +1391,6 @@ const MobissCatalog = () => {
               style={{ fontFamily: "'Poppins', sans-serif" }}>
               Seu celular merece mais. Seu celular merece Mobiss. 🩵
             </p>
-
-            <div className={`flex flex-wrap justify-center gap-8 md:gap-16 transition-all duration-700 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-white">✨</div>
-                <div className="text-white/70 text-sm mt-1">Qualidade</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-white">💬</div>
-                <div className="text-white/70 text-sm mt-1">Atendimento direto</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-white">🚀</div>
-                <div className="text-white/70 text-sm mt-1">Entrega ágil</div>
-              </div>
-            </div>
           </div>
         </div>
 
