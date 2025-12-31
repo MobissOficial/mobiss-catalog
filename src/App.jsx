@@ -336,6 +336,7 @@ const MobissCatalog = () => {
     };
 
     const handleAddToCart = (e) => {
+      e.preventDefault();
       e.stopPropagation();
       if (colorsList.length > 0) {
         // Se tem cores, abre modal de detalhes pra escolher
@@ -423,6 +424,7 @@ const MobissCatalog = () => {
                 <button
                   key={i}
                   onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     setSelectedColorByProduct({ ...selectedColorByProduct, [product.id]: i });
                   }}
@@ -659,8 +661,13 @@ const MobissCatalog = () => {
                   required
                   step="0.01"
                   min="0"
-                  defaultValue={editingProduct?.price || ''}
-                  onBlur={(e) => setEditingProduct({ ...editingProduct, price: parseFloat(e.target.value) || 0 })}
+                  defaultValue={editingProduct?.price ? Number(editingProduct.price).toFixed(2) : ''}
+                  onBlur={(e) => {
+                    const value = parseFloat(e.target.value) || 0;
+                    const formatted = Math.round(value * 100) / 100;
+                    e.target.value = formatted.toFixed(2);
+                    setEditingProduct({ ...editingProduct, price: formatted });
+                  }}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
                   placeholder="89.90"
                 />
@@ -671,8 +678,17 @@ const MobissCatalog = () => {
                   type="number"
                   step="0.01"
                   min="0"
-                  defaultValue={editingProduct?.originalPrice || ''}
-                  onBlur={(e) => setEditingProduct({ ...editingProduct, originalPrice: e.target.value ? parseFloat(e.target.value) : '' })}
+                  defaultValue={editingProduct?.originalPrice ? Number(editingProduct.originalPrice).toFixed(2) : ''}
+                  onBlur={(e) => {
+                    if (e.target.value) {
+                      const value = parseFloat(e.target.value);
+                      const formatted = Math.round(value * 100) / 100;
+                      e.target.value = formatted.toFixed(2);
+                      setEditingProduct({ ...editingProduct, originalPrice: formatted });
+                    } else {
+                      setEditingProduct({ ...editingProduct, originalPrice: '' });
+                    }
+                  }}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
                   placeholder="119.90"
                 />
@@ -1334,7 +1350,7 @@ const MobissCatalog = () => {
             {categories.map((category) => (
               <button
                 key={category.id}
-                onClick={() => setSelectedCategory(category.id)}
+                onClick={(e) => { e.preventDefault(); setSelectedCategory(category.id); }}
                 className="flex items-center gap-2 px-5 py-2.5 rounded-full text-sm font-medium whitespace-nowrap transition-all duration-300"
                 style={{
                   background: selectedCategory === category.id ? `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDark})` : 'transparent',
@@ -1351,7 +1367,7 @@ const MobissCatalog = () => {
             <span className="text-sm font-medium" style={{ color: colors.gray }}>Seu iPhone:</span>
             <select
               value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
+              onChange={(e) => { e.preventDefault(); setSelectedModel(e.target.value); }}
               className="px-4 py-2 rounded-xl text-sm border focus:outline-none"
               style={{ background: 'white', color: colors.dark, borderColor: `${colors.primary}20` }}
             >
@@ -1362,7 +1378,7 @@ const MobissCatalog = () => {
             
             {(selectedCategory !== 'all' || selectedModel !== 'all' || searchTerm) && (
               <button
-                onClick={() => { setSelectedCategory('all'); setSelectedModel('all'); setSearchTerm(''); }}
+                onClick={(e) => { e.preventDefault(); setSelectedCategory('all'); setSelectedModel('all'); setSearchTerm(''); }}
                 className="ml-auto text-sm font-medium"
                 style={{ color: colors.primary }}
               >
@@ -1396,7 +1412,7 @@ const MobissCatalog = () => {
               <h3 className="text-xl font-semibold mb-2" style={{ color: colors.dark }}>Ops! Nada por aqui.</h3>
               <p className="mb-6" style={{ color: colors.gray }}>Tenta ajustar os filtros ou buscar de outro jeito</p>
               <button
-                onClick={() => { setSelectedCategory('all'); setSelectedModel('all'); setSearchTerm(''); }}
+                onClick={(e) => { e.preventDefault(); setSelectedCategory('all'); setSelectedModel('all'); setSearchTerm(''); }}
                 className="px-6 py-3 rounded-full text-white font-medium"
                 style={{ background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDark})` }}
               >
