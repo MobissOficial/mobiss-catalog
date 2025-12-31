@@ -287,10 +287,12 @@ const MobissCatalog = () => {
     setEditingProduct({
       id: `temp_${Date.now()}`,
       name: '',
+      description: '',
       category: 'cases',
       models: ['all'],
       price: 0,
       originalPrice: '',
+      image: '',
       colorVariants: [],
       tag: '',
       magsafe: false
@@ -476,47 +478,52 @@ const MobissCatalog = () => {
   };
 
   // Componente Card do Produto (Admin)
-  const AdminProductCard = ({ product }) => (
-    <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex gap-4">
-      <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center"
-        style={{ background: colors.lightGray }}>
-        {product.image ? (
-          <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
-        ) : (
-          <span className="text-3xl">
-            {product.category === 'cases' ? '📱' :
-             product.category === 'screen' ? '🛡️' :
-             product.category === 'chargers' ? '⚡' :
-             product.category === 'cables' ? '🔌' :
-             product.category === 'audio' ? '🎧' : '🧲'}
-          </span>
-        )}
+  const AdminProductCard = ({ product }) => {
+    // Pega a imagem principal ou a primeira variação de cor
+    const displayImage = product.image || (product.colorVariants && product.colorVariants.length > 0 ? product.colorVariants[0].image : null);
+    
+    return (
+      <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex gap-4">
+        <div className="w-24 h-24 rounded-xl overflow-hidden flex-shrink-0 flex items-center justify-center"
+          style={{ background: colors.lightGray }}>
+          {displayImage ? (
+            <img src={displayImage} alt={product.name} className="w-full h-full object-cover" />
+          ) : (
+            <span className="text-3xl">
+              {product.category === 'cases' ? '📱' :
+               product.category === 'screen' ? '🛡️' :
+               product.category === 'chargers' ? '⚡' :
+               product.category === 'cables' ? '🔌' :
+               product.category === 'audio' ? '🎧' : '🧲'}
+            </span>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
+          <p className="text-sm text-gray-500">{categories.find(c => c.id === product.category)?.name}</p>
+          <p className="text-lg font-bold mt-1" style={{ color: colors.primary }}>{formatPrice(product.price)}</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <button 
+            onClick={() => startEditProduct(product)}
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+          >
+            <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+          </button>
+          <button 
+            onClick={() => handleDeleteProduct(product.id)}
+            className="p-2 rounded-lg hover:bg-red-50 transition-colors"
+          >
+            <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <h3 className="font-semibold text-gray-900 truncate">{product.name}</h3>
-        <p className="text-sm text-gray-500">{categories.find(c => c.id === product.category)?.name}</p>
-        <p className="text-lg font-bold mt-1" style={{ color: colors.primary }}>{formatPrice(product.price)}</p>
-      </div>
-      <div className="flex flex-col gap-2">
-        <button 
-          onClick={() => startEditProduct(product)}
-          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
-        >
-          <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-        </button>
-        <button 
-          onClick={() => handleDeleteProduct(product.id)}
-          className="p-2 rounded-lg hover:bg-red-50 transition-colors"
-        >
-          <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-          </svg>
-        </button>
-      </div>
-    </div>
-  );
+    );
+  };
 
   // Formulário de Produto - renderizado inline para evitar perda de foco
   const renderProductForm = () => {
@@ -542,20 +549,74 @@ const MobissCatalog = () => {
           </div>
           
           <form onSubmit={handleSaveProduct} className="p-6 space-y-6">
-            {/* Variações de Cor com Foto */}
+            {/* Foto Principal */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Variações de Cor (com foto individual - max 2MB cada)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Foto Principal do Produto (max 2MB)</label>
+              <div className="flex items-center gap-4">
+                <div 
+                  className="w-32 h-32 rounded-2xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-gray-400 transition-colors overflow-hidden"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const input = document.createElement('input');
+                    input.type = 'file';
+                    input.accept = 'image/*';
+                    input.onchange = (ev) => {
+                      const file = ev.target.files[0];
+                      if (file) {
+                        if (file.size > 2000000) {
+                          alert('Imagem muito grande! Use uma imagem menor que 2MB.');
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setEditingProduct({ ...editingProduct, image: reader.result });
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    };
+                    input.click();
+                  }}
+                  style={{ background: colors.lightGray }}
+                >
+                  {editingProduct?.image ? (
+                    <img src={editingProduct.image} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="text-center">
+                      <svg className="w-8 h-8 mx-auto text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                      </svg>
+                      <span className="text-xs text-gray-500 mt-1 block">Adicionar foto</span>
+                    </div>
+                  )}
+                </div>
+                {editingProduct?.image && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.preventDefault(); setEditingProduct({ ...editingProduct, image: '' }); }}
+                    className="text-sm text-red-500 hover:text-red-600"
+                  >
+                    Remover foto
+                  </button>
+                )}
+              </div>
+              <p className="text-xs text-gray-500 mt-2">Foto usada quando o produto não tem variações de cor ou como imagem padrão.</p>
+            </div>
+
+            {/* Variações de Cor com Foto (opcional) */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Variações de Cor (opcional - cada cor com sua foto)</label>
               <div className="space-y-3 p-4 bg-gray-50 rounded-xl">
                 {(editingProduct?.colorVariants || []).map((variant, index) => (
                   <div key={index} className="flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200">
                     <div 
                       className="w-16 h-16 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center cursor-pointer hover:border-gray-400 transition-colors overflow-hidden flex-shrink-0"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
                         const input = document.createElement('input');
                         input.type = 'file';
                         input.accept = 'image/*';
-                        input.onchange = (e) => {
-                          const file = e.target.files[0];
+                        input.onchange = (ev) => {
+                          const file = ev.target.files[0];
                           if (file) {
                             if (file.size > 2000000) {
                               alert('Imagem muito grande! Use uma imagem menor que 2MB.');
@@ -591,11 +652,13 @@ const MobissCatalog = () => {
                         newVariants[index] = { ...newVariants[index], name: e.target.value };
                         setEditingProduct({ ...editingProduct, colorVariants: newVariants });
                       }}
+                      onClick={(e) => e.stopPropagation()}
                       className="flex-1 px-3 py-2 rounded-lg border border-gray-200 focus:outline-none focus:ring-2 text-sm"
                     />
                     <button
                       type="button"
-                      onClick={() => {
+                      onClick={(e) => {
+                        e.preventDefault();
                         const newVariants = (editingProduct?.colorVariants || []).filter((_, i) => i !== index);
                         setEditingProduct({ ...editingProduct, colorVariants: newVariants });
                       }}
@@ -609,7 +672,8 @@ const MobissCatalog = () => {
                 ))}
                 <button
                   type="button"
-                  onClick={() => {
+                  onClick={(e) => {
+                    e.preventDefault();
                     const newVariants = [...(editingProduct?.colorVariants || []), { name: '', image: '' }];
                     setEditingProduct({ ...editingProduct, colorVariants: newVariants });
                   }}
@@ -621,7 +685,7 @@ const MobissCatalog = () => {
                   Adicionar cor
                 </button>
               </div>
-              <p className="text-xs text-gray-500 mt-2">Adicione cada cor com sua respectiva foto. A primeira cor será a foto principal do produto.</p>
+              <p className="text-xs text-gray-500 mt-2">Deixe vazio se o produto não tem variações de cor (ex: carregadores, cabos).</p>
             </div>
 
             {/* Nome */}
@@ -632,8 +696,22 @@ const MobissCatalog = () => {
                 required
                 defaultValue={editingProduct?.name || ''}
                 onBlur={(e) => setEditingProduct({ ...editingProduct, name: e.target.value })}
+                onClick={(e) => e.stopPropagation()}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-opacity-50"
                 placeholder="Ex: Capinha Silicone Premium"
+              />
+            </div>
+
+            {/* Descrição */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Descrição (opcional)</label>
+              <textarea
+                defaultValue={editingProduct?.description || ''}
+                onBlur={(e) => setEditingProduct({ ...editingProduct, description: e.target.value })}
+                onClick={(e) => e.stopPropagation()}
+                rows={3}
+                className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-opacity-50 resize-none"
+                placeholder="Ex: Capinha de silicone macio, proteção total contra quedas..."
               />
             </div>
 
@@ -644,6 +722,7 @@ const MobissCatalog = () => {
                 required
                 value={editingProduct?.category || 'cases'}
                 onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })}
+                onClick={(e) => e.stopPropagation()}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
               >
                 {categories.filter(c => c.id !== 'all').map(cat => (
@@ -668,6 +747,7 @@ const MobissCatalog = () => {
                     e.target.value = formatted.toFixed(2);
                     setEditingProduct({ ...editingProduct, price: formatted });
                   }}
+                  onClick={(e) => e.stopPropagation()}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
                   placeholder="89.90"
                 />
@@ -689,6 +769,7 @@ const MobissCatalog = () => {
                       setEditingProduct({ ...editingProduct, originalPrice: '' });
                     }
                   }}
+                  onClick={(e) => e.stopPropagation()}
                   className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
                   placeholder="119.90"
                 />
@@ -700,11 +781,12 @@ const MobissCatalog = () => {
               <label className="block text-sm font-medium text-gray-700 mb-2">Modelos Compatíveis</label>
               <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-3 bg-gray-50 rounded-xl">
                 {iphoneModels.map(model => (
-                  <label key={model.id} className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300">
+                  <label key={model.id} className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-gray-300" onClick={(e) => e.stopPropagation()}>
                     <input
                       type="checkbox"
                       checked={editingProduct?.models?.includes(model.id) || false}
                       onChange={(e) => {
+                        e.stopPropagation();
                         const models = editingProduct?.models || [];
                         if (e.target.checked) {
                           setEditingProduct({ ...editingProduct, models: [...models, model.id] });
@@ -712,6 +794,7 @@ const MobissCatalog = () => {
                           setEditingProduct({ ...editingProduct, models: models.filter(m => m !== model.id) });
                         }
                       }}
+                      onClick={(e) => e.stopPropagation()}
                       className="rounded"
                     />
                     <span className="text-sm">{model.name}</span>
@@ -726,6 +809,7 @@ const MobissCatalog = () => {
               <select
                 value={editingProduct?.tag || ''}
                 onChange={(e) => setEditingProduct({ ...editingProduct, tag: e.target.value })}
+                onClick={(e) => e.stopPropagation()}
                 className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
               >
                 {tagOptions.map(tag => (
@@ -736,11 +820,12 @@ const MobissCatalog = () => {
 
             {/* MagSafe */}
             <div>
-              <label className="flex items-center gap-3 cursor-pointer">
+              <label className="flex items-center gap-3 cursor-pointer" onClick={(e) => e.stopPropagation()}>
                 <input
                   type="checkbox"
                   checked={editingProduct?.magsafe || false}
                   onChange={(e) => setEditingProduct({ ...editingProduct, magsafe: e.target.checked })}
+                  onClick={(e) => e.stopPropagation()}
                   className="w-5 h-5 rounded"
                 />
                 <span className="text-sm font-medium text-gray-700">Compatível com MagSafe</span>
@@ -1013,6 +1098,10 @@ const MobissCatalog = () => {
           {/* Conteúdo */}
           <div className="p-6">
             <h3 className="font-bold text-xl mb-2" style={{ color: colors.dark }}>{product.name}</h3>
+            
+            {product.description && (
+              <p className="text-sm mb-4" style={{ color: colors.gray }}>{product.description}</p>
+            )}
             
             <div className="flex items-center gap-3 mb-4">
               {product.originalPrice && (
@@ -1302,21 +1391,6 @@ const MobissCatalog = () => {
               style={{ fontFamily: "'Poppins', sans-serif" }}>
               Seu celular merece mais. Seu celular merece Mobiss. 🩵
             </p>
-
-            <div className={`flex flex-wrap justify-center gap-8 md:gap-16 transition-all duration-700 delay-300 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}>
-              <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-white">✨</div>
-                <div className="text-white/70 text-sm mt-1">Qualidade</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-white">💬</div>
-                <div className="text-white/70 text-sm mt-1">Atendimento direto</div>
-              </div>
-              <div className="text-center">
-                <div className="text-3xl md:text-4xl font-bold text-white">🚀</div>
-                <div className="text-white/70 text-sm mt-1">Entrega ágil</div>
-              </div>
-            </div>
           </div>
         </div>
 
