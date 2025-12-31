@@ -25,6 +25,14 @@ const MobissCatalog = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [hoveredProduct, setHoveredProduct] = useState(null);
   const [selectedColorByProduct, setSelectedColorByProduct] = useState({});
+  
+  // Estados do carrinho
+  const [cart, setCart] = useState([]);
+  const [showCart, setShowCart] = useState(false);
+  
+  // Estado do modal de detalhes do produto
+  const [selectedProductDetails, setSelectedProductDetails] = useState(null);
+  const [detailsSelectedColor, setDetailsSelectedColor] = useState('');
 
   // Estados do admin
   const [editingProduct, setEditingProduct] = useState(null);
@@ -109,31 +117,105 @@ const MobissCatalog = () => {
     return Number(price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
   };
 
-  // Função para abrir modal de cor ou ir direto pro WhatsApp
-  const handleWhatsAppClick = (product) => {
-    const hasColorVariants = product.colorVariants && product.colorVariants.length > 0;
-    const hasOldColors = product.colors && product.colors.length > 0;
+  // Funções do Carrinho
+  const addToCart = (product, colorName = null) => {
+    const cartItem = {
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      color: colorName,
+      image: getProductImage(product, colorName),
+      quantity: 1
+    };
     
-    if (hasColorVariants || hasOldColors) {
-      setSelectedProductForWhatsapp(product);
-      setSelectedColor('');
+    // Verifica se já existe no carrinho (mesmo produto + mesma cor)
+    const existingIndex = cart.findIndex(item => 
+      item.id === product.id && item.color === colorName
+    );
+    
+    if (existingIndex >= 0) {
+      // Incrementa quantidade
+      const newCart = [...cart];
+      newCart[existingIndex].quantity += 1;
+      setCart(newCart);
     } else {
-      openWhatsApp(product, null);
+      // Adiciona novo item
+      setCart([...cart, cartItem]);
     }
+    
+    // Fecha modal de detalhes se estiver aberto
+    setSelectedProductDetails(null);
+    setDetailsSelectedColor('');
   };
 
-  // Função para abrir WhatsApp com mensagem
-  const openWhatsApp = (product, color) => {
-    let message = `Oi! Vi no catálogo e quero saber mais sobre:\n\n*${product.name}*`;
-    if (color) {
-      message += `\nCor: ${color}`;
+  const removeFromCart = (index) => {
+    setCart(cart.filter((_, i) => i !== index));
+  };
+
+  const updateCartQuantity = (index, newQuantity) => {
+    if (newQuantity < 1) {
+      removeFromCart(index);
+      return;
     }
-    message += `\nPreço: ${formatPrice(product.price)}`;
+    const newCart = [...cart];
+    newCart[index].quantity = newQuantity;
+    setCart(newCart);
+  };
+
+  const getCartTotal = () => {
+    return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  };
+
+  const getCartItemsCount = () => {
+    return cart.reduce((count, item) => count + item.quantity, 0);
+  };
+
+  const getProductImage = (product, colorName) => {
+    if (product.colorVariants && product.colorVariants.length > 0) {
+      if (colorName) {
+        const variant = product.colorVariants.find(v => v.name === colorName);
+        return variant?.image || product.colorVariants[0]?.image;
+      }
+      return product.colorVariants[0]?.image;
+    }
+    return product.image;
+  };
+
+  // Enviar pedido pelo WhatsApp
+  const sendCartToWhatsApp = () => {
+    if (cart.length === 0) return;
+    
+    let message = `Oi! Quero fazer um pedido:\n\n`;
+    
+    cart.forEach((item, index) => {
+      message += `${item.quantity}x ${item.name}`;
+      if (item.color) {
+        message += ` (${item.color})`;
+      }
+      message += ` - ${formatPrice(item.price * item.quantity)}\n`;
+    });
+    
+    message += `\n*Total: ${formatPrice(getCartTotal())}*`;
     
     const url = `https://wa.me/5548992082828?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
-    setSelectedProductForWhatsapp(null);
-    setSelectedColor('');
+    
+    // Limpa o carrinho após enviar
+    setCart([]);
+    setShowCart(false);
+  };
+
+  // Abrir modal de detalhes do produto
+  const openProductDetails = (product) => {
+    setSelectedProductDetails(product);
+    // Se tem cores, seleciona a primeira
+    if (product.colorVariants && product.colorVariants.length > 0) {
+      setDetailsSelectedColor(product.colorVariants[0].name);
+    } else if (product.colors && product.colors.length > 0) {
+      setDetailsSelectedColor(product.colors[0]);
+    } else {
+      setDetailsSelectedColor('');
+    }
   };
 
   // Funções do Admin
@@ -233,6 +315,7 @@ const MobissCatalog = () => {
     const colorsList = hasColorVariants 
       ? product.colorVariants.map(v => v.name) 
       : (product.colors || []);
+    const currentColorName = colorsList[currentColorIndex] || null;
 
     const getColorHex = (colorName) => {
       const name = colorName?.toLowerCase() || '';
@@ -250,6 +333,17 @@ const MobissCatalog = () => {
       if (name.includes('laranja')) return '#ea580c';
       if (name.includes('amarelo')) return '#eab308';
       return '#e5e7eb';
+    };
+
+    const handleAddToCart = (e) => {
+      e.stopPropagation();
+      if (colorsList.length > 0) {
+        // Se tem cores, abre modal de detalhes pra escolher
+        openProductDetails(product);
+      } else {
+        // Sem cores, adiciona direto
+        addToCart(product, null);
+      }
     };
 
     return (
@@ -288,8 +382,12 @@ const MobissCatalog = () => {
           </div>
         )}
 
-        <div className="relative h-56 flex items-center justify-center overflow-hidden"
-          style={{ background: `linear-gradient(180deg, ${colors.lightGray} 0%, #e8f0ee 100%)` }}>
+        {/* Imagem clicável */}
+        <div 
+          className="relative h-56 flex items-center justify-center overflow-hidden cursor-pointer"
+          style={{ background: `linear-gradient(180deg, ${colors.lightGray} 0%, #e8f0ee 100%)` }}
+          onClick={() => openProductDetails(product)}
+        >
           <div className={`transition-transform duration-500 ${hoveredProduct === product.id ? 'scale-110' : 'scale-100'}`}>
             {currentImage ? (
               <img src={currentImage} alt={product.name} className="w-40 h-40 object-contain" />
@@ -311,8 +409,11 @@ const MobissCatalog = () => {
         </div>
 
         <div className="p-5">
-          <h3 className="font-semibold text-base leading-tight mb-2 line-clamp-2"
-            style={{ fontFamily: "'Poppins', sans-serif", color: colors.dark }}>
+          <h3 
+            className="font-semibold text-base leading-tight mb-2 line-clamp-2 cursor-pointer hover:underline"
+            style={{ fontFamily: "'Poppins', sans-serif", color: colors.dark }}
+            onClick={() => openProductDetails(product)}
+          >
             {product.name}
           </h3>
           
@@ -321,7 +422,10 @@ const MobissCatalog = () => {
               {colorsList.slice(0, 5).map((colorName, i) => (
                 <button
                   key={i}
-                  onClick={() => setSelectedColorByProduct({ ...selectedColorByProduct, [product.id]: i })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedColorByProduct({ ...selectedColorByProduct, [product.id]: i });
+                  }}
                   className={`w-5 h-5 rounded-full transition-all duration-200 ${currentColorIndex === i ? 'ring-2 ring-offset-1' : ''}`}
                   style={{ 
                     background: getColorHex(colorName),
@@ -350,18 +454,18 @@ const MobissCatalog = () => {
               </span>
             </div>
             
+            {/* Botão Adicionar */}
             <button 
-              onClick={() => handleWhatsAppClick(product)}
-              className="w-11 h-11 rounded-full flex items-center justify-center transition-all duration-300 hover:scale-110"
+              onClick={handleAddToCart}
+              className="px-4 py-2 rounded-full flex items-center gap-2 transition-all duration-300 hover:scale-105 text-sm font-medium"
               style={{ 
-                background: hoveredProduct === product.id 
-                  ? '#25D366'
-                  : colors.lightGray,
-                color: hoveredProduct === product.id ? 'white' : colors.gray
+                background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDark})`,
+                color: 'white'
               }}>
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
+              Adicionar
             </button>
           </div>
         </div>
@@ -801,10 +905,11 @@ const MobissCatalog = () => {
   );
 
   // Modal de seleção de cor
-  const ColorSelectionModal = () => {
-    if (!selectedProductForWhatsapp) return null;
+  // Modal de Detalhes do Produto
+  const ProductDetailsModal = () => {
+    if (!selectedProductDetails) return null;
     
-    const product = selectedProductForWhatsapp;
+    const product = selectedProductDetails;
     
     // Suporte para colorVariants (novo) e colors (antigo)
     const hasColorVariants = product.colorVariants && product.colorVariants.length > 0;
@@ -839,18 +944,38 @@ const MobissCatalog = () => {
       return '#e5e7eb';
     };
 
-    const currentImage = selectedColor ? getImageForColor(selectedColor) : (hasColorVariants ? product.colorVariants[0]?.image : product.image);
+    const currentImage = detailsSelectedColor ? getImageForColor(detailsSelectedColor) : (hasColorVariants ? product.colorVariants[0]?.image : product.image);
+    
+    const handleAddToCartFromDetails = () => {
+      if (colorsList.length > 0 && !detailsSelectedColor) {
+        alert('Selecione uma cor');
+        return;
+      }
+      addToCart(product, detailsSelectedColor || null);
+    };
     
     return (
-      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setSelectedProductForWhatsapp(null)}>
-        <div className="bg-white rounded-3xl w-full max-w-sm overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => { setSelectedProductDetails(null); setDetailsSelectedColor(''); }}>
+        <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
           {/* Header com imagem */}
-          <div className="relative h-48 flex items-center justify-center" style={{ background: `linear-gradient(180deg, ${colors.lightGray} 0%, #e8f0ee 100%)` }}>
+          <div className="relative h-64 flex items-center justify-center" style={{ background: `linear-gradient(180deg, ${colors.lightGray} 0%, #e8f0ee 100%)` }}>
+            {product.tag && (
+              <div className="absolute top-4 left-4 z-10">
+                <span className="inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold tracking-wide text-white"
+                  style={{ 
+                    background: product.tag === 'Mais Pedida' ? `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDark})` 
+                      : product.tag === 'Novidade' ? `linear-gradient(135deg, ${colors.accent}, ${colors.primary})`
+                      : `linear-gradient(135deg, ${colors.primaryLight}, ${colors.primary})`
+                  }}>
+                  {product.tag}
+                </span>
+              </div>
+            )}
             {currentImage ? (
-              <img src={currentImage} alt={product.name} className="w-32 h-32 object-contain transition-all duration-300" />
+              <img src={currentImage} alt={product.name} className="w-48 h-48 object-contain transition-all duration-300" />
             ) : (
-              <div className="w-28 h-28 rounded-2xl flex items-center justify-center" style={{ background: `${colors.primary}20` }}>
-                <span className="text-5xl">
+              <div className="w-36 h-36 rounded-2xl flex items-center justify-center" style={{ background: `${colors.primary}20` }}>
+                <span className="text-6xl">
                   {product.category === 'cases' ? '📱' :
                    product.category === 'screen' ? '🛡️' :
                    product.category === 'chargers' ? '⚡' :
@@ -860,10 +985,10 @@ const MobissCatalog = () => {
               </div>
             )}
             <button 
-              onClick={() => setSelectedProductForWhatsapp(null)}
-              className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/80 flex items-center justify-center hover:bg-white transition-colors"
+              onClick={() => { setSelectedProductDetails(null); setDetailsSelectedColor(''); }}
+              className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/80 flex items-center justify-center hover:bg-white transition-colors shadow-lg"
             >
-              <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
@@ -871,51 +996,206 @@ const MobissCatalog = () => {
           
           {/* Conteúdo */}
           <div className="p-6">
-            <h3 className="font-bold text-lg mb-1" style={{ color: colors.dark }}>{product.name}</h3>
-            <p className="text-xl font-bold mb-4" style={{ color: colors.primary }}>{formatPrice(product.price)}</p>
+            <h3 className="font-bold text-xl mb-2" style={{ color: colors.dark }}>{product.name}</h3>
             
-            <p className="text-sm font-medium mb-3" style={{ color: colors.gray }}>Escolha a cor:</p>
-            
-            <div className="flex flex-wrap gap-2 mb-6">
-              {colorsList.map((colorName, i) => (
-                <button
-                  key={i}
-                  onClick={() => setSelectedColor(colorName)}
-                  className={`px-4 py-2 rounded-full text-sm font-medium border-2 transition-all ${
-                    selectedColor === colorName ? 'border-current' : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                  style={{ 
-                    color: selectedColor === colorName ? colors.primary : colors.dark,
-                    background: selectedColor === colorName ? `${colors.primary}10` : 'white'
-                  }}
-                >
-                  <span className="inline-block w-3 h-3 rounded-full mr-2" style={{
-                    background: getColorHex(colorName),
-                    border: colorName?.toLowerCase().includes('branco') || colorName?.toLowerCase().includes('transparente') ? '1px solid #d1d5db' : 'none'
-                  }} />
-                  {colorName}
-                </button>
-              ))}
+            <div className="flex items-center gap-3 mb-4">
+              {product.originalPrice && (
+                <span className="text-lg line-through" style={{ color: colors.gray }}>
+                  {formatPrice(product.originalPrice)}
+                </span>
+              )}
+              <span className="text-2xl font-bold" style={{ color: colors.primary }}>{formatPrice(product.price)}</span>
             </div>
             
+            {product.magsafe && (
+              <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg" style={{ background: `${colors.primary}10` }}>
+                <span className="text-sm font-medium" style={{ color: colors.primary }}>✓ Compatível com MagSafe</span>
+              </div>
+            )}
+            
+            {colorsList.length > 0 && (
+              <>
+                <p className="text-sm font-medium mb-3" style={{ color: colors.gray }}>Escolha a cor:</p>
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {colorsList.map((colorName, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setDetailsSelectedColor(colorName)}
+                      className={`px-4 py-2 rounded-full text-sm font-medium border-2 transition-all ${
+                        detailsSelectedColor === colorName ? 'border-current' : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                      style={{ 
+                        color: detailsSelectedColor === colorName ? colors.primary : colors.dark,
+                        background: detailsSelectedColor === colorName ? `${colors.primary}10` : 'white'
+                      }}
+                    >
+                      <span className="inline-block w-3 h-3 rounded-full mr-2" style={{
+                        background: getColorHex(colorName),
+                        border: colorName?.toLowerCase().includes('branco') || colorName?.toLowerCase().includes('transparente') ? '1px solid #d1d5db' : 'none'
+                      }} />
+                      {colorName}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            
             <button
-              onClick={() => openWhatsApp(product, selectedColor)}
-              disabled={!selectedColor}
-              className={`w-full py-3 rounded-xl font-medium flex items-center justify-center gap-2 transition-all ${
-                selectedColor ? 'hover:opacity-90' : 'opacity-50 cursor-not-allowed'
+              onClick={handleAddToCartFromDetails}
+              disabled={colorsList.length > 0 && !detailsSelectedColor}
+              className={`w-full py-4 rounded-xl font-medium flex items-center justify-center gap-2 transition-all ${
+                (colorsList.length === 0 || detailsSelectedColor) ? 'hover:opacity-90' : 'opacity-50 cursor-not-allowed'
               }`}
-              style={{ background: '#25D366', color: 'white' }}
+              style={{ background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDark})`, color: 'white' }}
             >
-              <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
-              {selectedColor ? 'Chamar no WhatsApp' : 'Selecione uma cor'}
+              {colorsList.length > 0 && !detailsSelectedColor ? 'Selecione uma cor' : 'Adicionar ao carrinho'}
             </button>
           </div>
         </div>
       </div>
     );
   };
+
+  // Modal do Carrinho
+  const CartModal = () => {
+    if (!showCart) return null;
+    
+    return (
+      <div className="fixed inset-0 bg-black/50 flex items-end sm:items-center justify-center z-50" onClick={() => setShowCart(false)}>
+        <div className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl max-h-[85vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+          {/* Header */}
+          <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full flex items-center justify-center" style={{ background: `${colors.primary}15` }}>
+                <svg className="w-5 h-5" style={{ color: colors.primary }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="font-bold text-lg" style={{ color: colors.dark }}>Seu Carrinho</h3>
+                <p className="text-sm" style={{ color: colors.gray }}>{getCartItemsCount()} {getCartItemsCount() === 1 ? 'item' : 'itens'}</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowCart(false)}
+              className="w-10 h-10 rounded-full hover:bg-gray-100 flex items-center justify-center transition-colors"
+            >
+              <svg className="w-6 h-6 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+          
+          {/* Lista de itens */}
+          <div className="flex-1 overflow-y-auto p-6">
+            {cart.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center" style={{ background: colors.lightGray }}>
+                  <svg className="w-10 h-10" style={{ color: colors.gray }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                </div>
+                <p className="font-medium mb-1" style={{ color: colors.dark }}>Carrinho vazio</p>
+                <p className="text-sm" style={{ color: colors.gray }}>Adicione produtos para continuar</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {cart.map((item, index) => (
+                  <div key={index} className="flex gap-4 p-3 rounded-2xl" style={{ background: colors.lightGray }}>
+                    <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 bg-white flex items-center justify-center">
+                      {item.image ? (
+                        <img src={item.image} alt={item.name} className="w-full h-full object-contain" />
+                      ) : (
+                        <span className="text-2xl">📦</span>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-medium text-sm mb-1 truncate" style={{ color: colors.dark }}>{item.name}</h4>
+                      {item.color && (
+                        <p className="text-xs mb-2" style={{ color: colors.gray }}>Cor: {item.color}</p>
+                      )}
+                      <p className="font-bold" style={{ color: colors.primary }}>{formatPrice(item.price)}</p>
+                    </div>
+                    <div className="flex flex-col items-end justify-between">
+                      <button 
+                        onClick={() => removeFromCart(index)}
+                        className="w-8 h-8 rounded-full hover:bg-red-50 flex items-center justify-center transition-colors"
+                      >
+                        <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <button 
+                          onClick={() => updateCartQuantity(index, item.quantity - 1)}
+                          className="w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center hover:bg-gray-100 transition-colors"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                          </svg>
+                        </button>
+                        <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
+                        <button 
+                          onClick={() => updateCartQuantity(index, item.quantity + 1)}
+                          className="w-7 h-7 rounded-full flex items-center justify-center transition-colors"
+                          style={{ background: colors.primary, color: 'white' }}
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          
+          {/* Footer com total e botão */}
+          {cart.length > 0 && (
+            <div className="p-6 border-t border-gray-100">
+              <div className="flex items-center justify-between mb-4">
+                <span className="font-medium" style={{ color: colors.gray }}>Total:</span>
+                <span className="text-2xl font-bold" style={{ color: colors.primary }}>{formatPrice(getCartTotal())}</span>
+              </div>
+              <button
+                onClick={sendCartToWhatsApp}
+                className="w-full py-4 rounded-xl font-medium flex items-center justify-center gap-3 transition-all hover:opacity-90"
+                style={{ background: '#25D366', color: 'white' }}
+              >
+                <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+                Enviar pedido
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Botão flutuante do carrinho
+  const CartButton = () => (
+    <button
+      onClick={() => setShowCart(true)}
+      className="fixed bottom-6 right-6 w-16 h-16 rounded-full shadow-2xl flex items-center justify-center transition-all hover:scale-110 z-40"
+      style={{ background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryDark})` }}
+    >
+      <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+      </svg>
+      {getCartItemsCount() > 0 && (
+        <span className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-red-500 text-white text-xs font-bold flex items-center justify-center">
+          {getCartItemsCount()}
+        </span>
+      )}
+    </button>
+  );
 
   // Catálogo Principal
   const Catalog = () => (
@@ -1198,7 +1478,9 @@ const MobissCatalog = () => {
         input::placeholder { color: rgba(255,255,255,0.5); }
       `}</style>
 
-      <ColorSelectionModal />
+      <ProductDetailsModal />
+      <CartModal />
+      <CartButton />
     </div>
   );
 
