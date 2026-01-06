@@ -65,8 +65,13 @@ const MobissCatalog = () => {
     { id: 'holders', name: 'Suportes', icon: '🧲' },
   ];
 
-  const iphoneModels = [
+  // Modelos padrão (serão substituídos pelos do Firebase se existirem)
+  const defaultModels = [
     { id: 'all', name: 'Todos os Modelos' },
+    { id: '17-pro-max', name: 'iPhone 17 Pro Max' },
+    { id: '17-pro', name: 'iPhone 17 Pro' },
+    { id: '17-plus', name: 'iPhone 17 Plus' },
+    { id: '17', name: 'iPhone 17' },
     { id: '16-pro-max', name: 'iPhone 16 Pro Max' },
     { id: '16-pro', name: 'iPhone 16 Pro' },
     { id: '16-plus', name: 'iPhone 16 Plus' },
@@ -84,27 +89,93 @@ const MobissCatalog = () => {
     { id: '11', name: 'iPhone 11' },
   ];
 
+  const [iphoneModels, setIphoneModels] = useState(defaultModels);
+  const [showModelsManager, setShowModelsManager] = useState(false);
+  const [newModelName, setNewModelName] = useState('');
+
   const tagOptions = ['', 'Mais Pedida', 'Novidade', 'Promoção', 'Original', 'Proteção Total', 'Indestrutível', '3 em 1', '50% em 30min'];
 
-  // Carregar produtos do Firebase
+  // Carregar produtos e modelos do Firebase
   useEffect(() => {
-    const fetchProducts = async () => {
+    const fetchData = async () => {
       try {
-        const querySnapshot = await getDocs(collection(db, 'products'));
-        const productsData = querySnapshot.docs.map(doc => ({
+        // Carregar produtos
+        const productsSnapshot = await getDocs(collection(db, 'products'));
+        const productsData = productsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
         }));
         setProducts(productsData);
+
+        // Carregar modelos (se existirem)
+        const modelsSnapshot = await getDocs(collection(db, 'models'));
+        if (!modelsSnapshot.empty) {
+          const modelsData = modelsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          }));
+          // Ordena e adiciona "Todos os Modelos" no início
+          const sortedModels = modelsData.sort((a, b) => (a.order || 0) - (b.order || 0));
+          setIphoneModels([{ id: 'all', name: 'Todos os Modelos' }, ...sortedModels]);
+        }
       } catch (error) {
-        console.error('Erro ao carregar produtos:', error);
+        console.error('Erro ao carregar dados:', error);
       } finally {
         setLoading(false);
         setIsLoaded(true);
       }
     };
-    fetchProducts();
+    fetchData();
   }, []);
+
+  // Funções para gerenciar modelos
+  const saveModelsToFirebase = async (models) => {
+    try {
+      // Remove o "Todos os Modelos" antes de salvar
+      const modelsToSave = models.filter(m => m.id !== 'all');
+      
+      // Deleta modelos antigos
+      const oldModelsSnapshot = await getDocs(collection(db, 'models'));
+      for (const doc of oldModelsSnapshot.docs) {
+        await deleteDoc(doc.ref);
+      }
+      
+      // Salva novos modelos
+      for (let i = 0; i < modelsToSave.length; i++) {
+        await addDoc(collection(db, 'models'), {
+          name: modelsToSave[i].name,
+          order: i
+        });
+      }
+    } catch (error) {
+      console.error('Erro ao salvar modelos:', error);
+    }
+  };
+
+  const addNewModel = async () => {
+    if (!newModelName.trim()) return;
+    
+    const newId = newModelName.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+    const newModel = { id: newId, name: newModelName.trim() };
+    
+    // Insere após "Todos os Modelos" (índice 1)
+    const updatedModels = [
+      iphoneModels[0], // "Todos os Modelos"
+      newModel,
+      ...iphoneModels.slice(1)
+    ];
+    
+    setIphoneModels(updatedModels);
+    await saveModelsToFirebase(updatedModels);
+    setNewModelName('');
+  };
+
+  const removeModel = async (modelId) => {
+    if (modelId === 'all') return;
+    const updatedModels = iphoneModels.filter(m => m.id !== modelId);
+    setIphoneModels(updatedModels);
+    await saveModelsToFirebase(updatedModels);
+  };
 
   const filteredProducts = products.filter(product => {
     const categoryMatch = selectedCategory === 'all' || product.category === selectedCategory;
@@ -976,6 +1047,16 @@ const MobissCatalog = () => {
             </svg>
             Novo Produto
           </button>
+          <button
+            onClick={() => setShowModelsManager(true)}
+            className="px-5 py-2.5 rounded-xl font-medium transition-all hover:opacity-90 flex items-center gap-2 border-2"
+            style={{ borderColor: colors.primary, color: colors.primary }}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+            </svg>
+            Modelos
+          </button>
         </div>
 
         {/* Lista de Produtos */}
@@ -997,6 +1078,63 @@ const MobissCatalog = () => {
             >
               Adicionar Produto
             </button>
+          </div>
+        )}
+
+        {/* Modal Gerenciar Modelos */}
+        {showModelsManager && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setShowModelsManager(false)}>
+            <div className="bg-white rounded-3xl w-full max-w-md max-h-[80vh] overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="p-6 border-b border-gray-100 flex items-center justify-between">
+                <h3 className="text-xl font-bold" style={{ color: colors.dark }}>Gerenciar Modelos</h3>
+                <button onClick={() => setShowModelsManager(false)} className="p-2 rounded-full hover:bg-gray-100">
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              
+              <div className="p-6 border-b border-gray-100">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Adicionar novo modelo</label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newModelName}
+                    onChange={(e) => setNewModelName(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && addNewModel()}
+                    placeholder="Ex: iPhone 17 Ultra"
+                    className="flex-1 px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2"
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                  <button
+                    onClick={addNewModel}
+                    className="px-4 py-2 rounded-xl text-white font-medium"
+                    style={{ background: colors.primary }}
+                  >
+                    Adicionar
+                  </button>
+                </div>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-6">
+                <p className="text-sm text-gray-500 mb-4">Modelos cadastrados ({iphoneModels.length - 1})</p>
+                <div className="space-y-2">
+                  {iphoneModels.filter(m => m.id !== 'all').map((model) => (
+                    <div key={model.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                      <span className="font-medium" style={{ color: colors.dark }}>{model.name}</span>
+                      <button
+                        onClick={() => removeModel(model.id)}
+                        className="p-2 text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </main>
@@ -1370,12 +1508,6 @@ const MobissCatalog = () => {
         
         <div className="relative max-w-7xl mx-auto px-6">
           <div className="text-center">
-            <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 transition-all duration-700 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
-              style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(10px)' }}>
-              <span className="text-lg">🚀</span>
-              <span className="text-white/90 text-sm font-medium" style={{ fontFamily: "'Poppins', sans-serif" }}>Mobiss tá na área!</span>
-            </div>
-            
             <h2 className={`text-4xl md:text-6xl font-bold text-white mb-4 tracking-tight transition-all duration-700 delay-100 ${isLoaded ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
               style={{ fontFamily: "'Poppins', sans-serif" }}>
               Qualidade de verdade.
